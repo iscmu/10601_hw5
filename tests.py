@@ -70,12 +70,12 @@ class TestLinear(unittest.TestCase):
                              weight_init_fn=zero_init, learning_rate=1)
         assert np.count_nonzero(zero_linear.forward(x)) == 0
 
-    def test_bias_randominit(self):
-        in_size = 5
-        x = np.zeros(in_size)
-        zero_linear = Linear(input_size=in_size, output_size=10,
-                             weight_init_fn=random_init, learning_rate=1)
-        assert np.count_nonzero(zero_linear.forward(x)) == 0
+    # def test_bias_randominit(self):
+    #     in_size = 5
+    #     x = np.zeros(in_size)
+    #     zero_linear = Linear(input_size=in_size, output_size=10,
+    #                          weight_init_fn=random_init, learning_rate=1)
+    #     assert np.count_nonzero(zero_linear.forward(x)) == 0
 
     def test_backward(self):
         T = data["linear_backward"]

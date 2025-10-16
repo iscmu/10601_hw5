@@ -181,7 +181,6 @@ class SoftMaxCrossEntropy:
         :return: gradient with shape (num_classes,)
         """
         # TODO: implement using the formula you derived in the written
-        # PG 29 - see wq 2.2C
         ypred = np.zeros(len(y_hat))
         ypred[y] = 1
         # THIS IS DEFINITELY CORRECT (ATLEAST THE SHAPE)
@@ -210,9 +209,6 @@ class Sigmoid:
         #  the backward pass
         self.x = x
         return 1/(1 + np.exp(-x))
-        # # #RELU
-        # self.x = x
-        # return np.maximum(0, x)
     
     def backward(self, dz: np.ndarray) -> np.ndarray:
         """
@@ -252,17 +248,18 @@ class Linear:
         #  To be consistent with the formulas you derived in the written and
         #  in order for the unit tests to work correctly,
         #  the first dimension should be the output size
-        self.weights = weight_init_fn((input_size, output_size))
+        self.w = weight_init_fn((output_size, input_size))
 
         # TODO: set the bias terms to zero
-        self.bias = np.zeros(output_size)
+        self.bias = weight_init_fn((output_size,1))
+        self.w = np.concatenate((self.w, self.bias), axis=1)
 
         # TODO: Initialize matrix to store gradient with respect to weights
-        self.dw = weight_init_fn((input_size + 1, output_size))
+        self.dw = weight_init_fn((output_size, input_size + 1))
 
         # TODO: Initialize any additional values you may need to store for the
         #  backward pass here
-        self.x = 0
+        self.x = None
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """
@@ -280,12 +277,18 @@ class Linear:
         """
         # TODO: perform forward pass and save any values you may need for
         #  the backward pass
+        # (inp_size,) wo bias
 
-        # Folding bias into position 0
-        # Caching for backward pass
-        self.x = np.insert(x, 0, 1)
-        return  x @ self.weights + self.bias
-
+        #bias has to go in the beginning or no pass
+        x = np.insert(x, 0, 1)
+        # x has shape (in_size, )
+        # wt has shape (out_size, in_size)
+        # res has shape (out_size, )
+        res = self.w @ x
+        self.x = x
+        return res
+        # return  x[:, None].T @ self.w
+    
     def backward(self, dz: np.ndarray) -> np.ndarray:
         """
         :param dz: partial derivative of loss with respect to output z
@@ -307,7 +310,7 @@ class Linear:
         # dw = dL/dw = dL/dz * dz/dw
         self.dw = dz @ self.x
         # dx = dL/dx = dL/dz * dz/dx (return condition)
-        dx = dz.T @ self.dw
+        dx = dz.T @ self.w[:,1:]
         return dx
 
     def step(self) -> None:
@@ -315,11 +318,14 @@ class Linear:
         Apply SGD update to weights using self.dw, which should have been 
         set in NN.backward().
         """
-        # TODO: implement
-        b_w = np.concatenate((self.bias[:, None].T, self.weights), axis=0)
-        b_w = b_w - (self.learning_rate * self.dw).T
-        self.bias = b_w[0, :]
-        self.weights = b_w[1:, :]
+        # TODO: implement BIAS
+        # IGNORING BIAS
+        # b_w = np.concatenate((self.bias, self.w), axis=1)
+        # b_w = self.w
+        # b_w = b_w - (self.learning_rate * self.dw)
+        # self.bias = b_w[0, :]
+        # self.w = b_w[1:, :]
+        self.w = self.w - (self.learning_rate * self.dw)
 
 class NN:
     def __init__(self, input_size: int, hidden_size: int, output_size: int,
@@ -347,9 +353,9 @@ class NN:
 
         # TODO: initialize modules (see section 9.1.2 of the writeup)
         #  Hint: use the classes you've implemented above!
-        self.l1 = Linear(self.input_size, self.hidden_size, weight_init_fn, learning_rate)
+        self.linear1 = Linear(self.input_size, self.hidden_size, weight_init_fn, learning_rate)
         self.act1 = Sigmoid()
-        self.l2 = Linear(self.hidden_size, self.output_size, weight_init_fn, learning_rate)
+        self.linear2 = Linear(self.hidden_size, self.output_size, weight_init_fn, learning_rate)
         self.act2 = SoftMaxCrossEntropy()
         # raise NotImplementedError
 
@@ -365,9 +371,9 @@ class NN:
             loss: the cross_entropy loss for a given example
         """
         # TODO: call forward pass for each layer
-        a = self.l1.forward(x)
+        a = self.linear1.forward(x)
         z = self.act1.forward(a)
-        b = self.l2.forward(z)
+        b = self.linear2.forward(z)
         # Note that softmax and cross entropy embedded within a single layer
         yhat, cross_entropy = self.act2.forward(b, y)
         assert(yhat.shape == (10,))
@@ -388,17 +394,18 @@ class NN:
         # gb = gradient with shape (num_classes,)
         self.gb = self.act2.backward(y, y_hat) #DEFINITELY CORRECT
         logging.debug(f"gb\n {self.gb}")
+        assert(self.gb.shape == (10,))
 
         # gz = partial derivative of loss with respect to input x of linear
-        self.gz = self.l2.backward(self.gb)
+        self.gz = self.linear2.backward(self.gb)
         logging.debug(f"gz\n {self.gz}")
 
         # ga = partial derivative of loss with respect to input of sigmoid activation
-        self.ga = self.act1.backward(self.gz[:, 1:]) # Removing the gradient of the bias
+        self.ga = self.act1.backward(self.gz) # Removing the gradient of the bias
         logging.debug(f"ga\n {self.ga}")
 
         # gx = partial derivative of loss with respect to input x of linear
-        self.gx = self.l1.backward(self.ga.T)
+        self.gx = self.linear1.backward(self.ga.T)
         logging.debug(f"gx\n {self.gx}")
 
         # print(y, y_hat, self.gj, self.gb, self.gz, self.ga, self.gx, sep='\n')
@@ -409,18 +416,8 @@ class NN:
         Apply SGD update to weights.
         """
         # # TODO: call step for each relevant layer
-        self.l1.step()
-        self.l2.step() 
-
-        # self.alpha = self.alpha - getattr(self, "learning_rate") * getattr(self, "gx").T
-        # assert(self.alpha.shape == (129, 4))
-        # self.l1.weights = self.alpha[1:,:]
-        # self.l1.bias = self.alpha[1, :]
-
-        # self.beta = self.beta - getattr(self, "learning_rate") * getattr(self, "gz").T
-        # assert(self.beta.shape == (5, 10))
-        # self.l2.weights = self.beta[1:,:]
-        # self.l2.bias = self.beta[1, ]
+        self.linear1.step()
+        self.linear2.step() 
 
     def compute_loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
@@ -527,34 +524,32 @@ if __name__ == "__main__":
     # train model
     # (this line of code is already written for you)
     train_losses, test_losses = nn.train(X_tr, y_tr, X_test, y_test, n_epochs)
-    print(train_losses)
-    print("DONE TRAINING")
 
-    # # test model and get predicted labels and errors 
-    # # (this line of code is written for you)
-    # train_labels, train_error_rate = nn.test(X_tr, y_tr)
-    # test_labels, test_error_rate = nn.test(X_test, y_test)
+    # test model and get predicted labels and errors 
+    # (this line of code is written for you)
+    train_labels, train_error_rate = nn.test(X_tr, y_tr)
+    test_labels, test_error_rate = nn.test(X_test, y_test)
 
-    # # Write predicted label and error into file
-    # # Note that this assumes train_losses and test_losses are lists of floats
-    # # containing the per-epoch loss values.
-    # with open(out_tr, "w") as f:
-    #     for label in train_labels:
-    #         f.write(str(label) + "\n")
-    # with open(out_te, "w") as f:
-    #     for label in test_labels:
-    #         f.write(str(label) + "\n")
-    # with open(out_metrics, "w") as f:
-    #     for i in range(len(train_losses)):
-    #         cur_epoch = i + 1
-    #         cur_tr_loss = train_losses[i]
-    #         cur_te_loss = test_losses[i]
-    #         f.write("epoch={} crossentropy(train): {}\n".format(
-    #             cur_epoch, cur_tr_loss))
-    #         f.write("epoch={} crossentropy(validation): {}\n".format(
-    #             cur_epoch, cur_te_loss))
-    #     f.write("error(train): {}\n".format(train_error_rate))
-    #     f.write("error(validation): {}\n".format(test_error_rate))
+    # Write predicted label and error into file
+    # Note that this assumes train_losses and test_losses are lists of floats
+    # containing the per-epoch loss values.
+    with open(out_tr, "w") as f:
+        for label in train_labels:
+            f.write(str(label) + "\n")
+    with open(out_te, "w") as f:
+        for label in test_labels:
+            f.write(str(label) + "\n")
+    with open(out_metrics, "w") as f:
+        for i in range(len(train_losses)):
+            cur_epoch = i + 1
+            cur_tr_loss = train_losses[i]
+            cur_te_loss = test_losses[i]
+            f.write("epoch={} crossentropy(train): {}\n".format(
+                cur_epoch, cur_tr_loss))
+            f.write("epoch={} crossentropy(validation): {}\n".format(
+                cur_epoch, cur_te_loss))
+        f.write("error(train): {}\n".format(train_error_rate))
+        f.write("error(validation): {}\n".format(test_error_rate))
 
 
 
