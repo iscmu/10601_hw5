@@ -166,6 +166,8 @@ class SoftMaxCrossEntropy:
         """
         # TODO: Call your implementations of _softmax and _cross_entropy here
         yhat = self._softmax(z)
+        # logging.debug(f"yhat {yhat}")
+        assert(yhat.shape == (10,))
         return yhat, self._cross_entropy(y, yhat)
 
     def backward(self, y: int, y_hat: np.ndarray) -> np.ndarray:
@@ -185,6 +187,7 @@ class SoftMaxCrossEntropy:
         # TODO: implement using the formula you derived in the written
         # return 1/y_hat[y]
         # PG 29 - see wq 2.2C
+        # logging.debug(f"checkpoint 0 {y_hat} {y}")
         return y_hat - y
 
 
@@ -208,7 +211,10 @@ class Sigmoid:
         """
         # TODO: perform forward pass and save any values you may need for
         #  the backward pass
-        self.x = x
+        # self.x = x
+
+        self.x = 1/(1 + np.exp(-x))
+
         return 1/(1 + np.exp(-x))
     
     def backward(self, dz: np.ndarray) -> np.ndarray:
@@ -221,8 +227,8 @@ class Sigmoid:
         # TODO: implement
         # raise NotImplementedError
         # s' = s(1-s)
-        return dz * 1/(1 + np.exp(-self.x)) * (1 - 1/(1 + np.exp(-self.x)))
-    
+        grad = np.sum(dz, axis=0) * (1/(1 + np.exp(-self.x)) * (1 - 1/(1 + np.exp(-self.x)))[:, None].T)
+        return grad
 
 # Note: The ReLU class is only required for the empirical section.
 # The autograder does not test this component, so your submission will still
@@ -278,7 +284,7 @@ class Linear:
         :param learning_rate: learning rate for SGD training updates
         """
         # Initialize learning rate for SGD
-        self.lr = learning_rate
+        self.learning_rate = learning_rate
 
         # TODO: Initialize weight matrix for this layer - since we are
         #  folding the bias into the weight matrix, be careful about the
@@ -292,7 +298,7 @@ class Linear:
         self.bias = np.zeros(output_size)
 
         # TODO: Initialize matrix to store gradient with respect to weights
-        self.grad_weights = weight_init_fn((input_size + 1, output_size))
+        self.dw = weight_init_fn((input_size + 1, output_size))
 
         # TODO: Initialize any additional values you may need to store for the
         #  backward pass here
@@ -314,7 +320,9 @@ class Linear:
         """
         # TODO: perform forward pass and save any values you may need for
         #  the backward pass
-        self.x = x
+
+        # Folding bias into position 0
+        # Caching for backward pass
         return  x @ self.weights + self.bias
 
     def backward(self, dz: np.ndarray) -> np.ndarray:
@@ -333,9 +341,11 @@ class Linear:
         your forward() method.
         """
         # TODO: implement
-        self.dw = dz * np.sum(self.x, axis=0)
-        # assert(self.dw.shape == ())
-        return dz * np.sum(self.x, axis=0)
+        if len(dz.shape) < 2:
+            dz = dz[:, None]
+        self.x = self.x[None, :]
+        self.dw = dz @ self.x
+        return self.dw
         # raise NotImplementedError
 
     def step(self) -> None:
@@ -344,7 +354,11 @@ class Linear:
         set in NN.backward().
         """
         # TODO: implement
-        self.w = self.w - self.learning_rate * self.dw
+        w_b = np.concantenate(self.w, self.bias) - self.learning_rate * self.dw
+        self.weights = w_b[:, :-1]
+        print(self.weights.shape)
+        self.bias = w_b[:, -1]
+        print(self.bias.shape)
         # raise NotImplementedError
 
 
@@ -374,9 +388,9 @@ class NN:
 
         # TODO: initialize modules (see section 9.1.2 of the writeup)
         #  Hint: use the classes you've implemented above!
-        self.l1 = Linear(input_size, output_size, weight_init_fn, learning_rate)
+        self.l1 = Linear(self.input_size, self.hidden_size, weight_init_fn, learning_rate)
         self.act1 = Sigmoid()
-        self.l2 = Linear(input_size, output_size, weight_init_fn, learning_rate)
+        self.l2 = Linear(self.hidden_size, self.output_size, weight_init_fn, learning_rate)
         self.act2 = SoftMaxCrossEntropy()
         # raise NotImplementedError
 
@@ -393,13 +407,16 @@ class NN:
         """
         # TODO: call forward pass for each layer
         a = self.l1.forward(x)
-        logging.debug(f"{a}aaaa")
+        # logging.debug(f"l1 output:{a}")
         z = self.act1.forward(a)
-        logging.debug(z)
+        # logging.debug(f"sigmoid output:{z}")
         b = self.l2.forward(z)
-        logging.debug(b)
+        # logging.debug(f"l2 output:{b}")
         # Note that softmax and cross entropy embedded within a single layer
-        yhat, cross_entropy = self.act2.forward(b)
+        yhat, cross_entropy = self.act2.forward(b, y)
+        # logging.debug(f"yhat output:{yhat}")
+        # logging.debug(f"cross_entropy output:{cross_entropy}")
+        assert(yhat.shape == (10,))
         return yhat, cross_entropy
     
     def backward(self, y: int, y_hat: np.ndarray) -> None:
@@ -411,11 +428,19 @@ class NN:
         """
         # TODO: call backward pass for each layer
         # raise NotImplementedError
+        assert(y_hat.shape == (10,))
+        # logging.debug("BACKWARD")
         self.gj = djdj = 1
-        self.gb = self.act2.backward(y, y_hat, self.gj)
+        # logging.debug(f"gj {self.gj}")
+        self.gb = self.act2.backward(y, y_hat)
+        # logging.debug(f"gb {self.gb}")
         self.gz = self.l2.backward(self.gb)
+        # logging.debug(f"\ngz {self.gz}")
+        self.gz = self.gz[:, 1:] # Removing the gradient of the bias
         self.ga = self.act1.backward(self.gz)
-        self.gx = self.l1.backward(self.ga)
+        # logging.debug(f"ga {self.ga}")
+        self.gx = self.l1.backward(self.ga.T)
+        # logging.debug(f"gx {self.gx}")
 
 
     def step(self):
@@ -423,8 +448,13 @@ class NN:
         Apply SGD update to weights.
         """
         # TODO: call step for each relevant layer
-        self.alpha = self.alpha - getattr(self, "learning_rate") * getattr(self, "ga")
-        self.beta = self.beta - getattr(self, "learning_rate") * getattr(self, "gb")
+        self.l1.step()
+        self.l2.step()
+        logging.debug(sum(self.l1.w))
+        logging.debug(sum(self.l2.w))
+        # self.alpha = self.alpha - getattr(self, "learning_rate") * getattr(self, "gx").T
+        # self.beta = self.beta - getattr(self, "learning_rate") * getattr(self, "gz").T
+
 
     def compute_loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
@@ -437,14 +467,13 @@ class NN:
         #  Hint: reuse your forward function
         losses = []
         for x, y in zip(X, y):
-            J, yhat = self.forward(x, y)
+            yhat,J = self.forward(x, y)
             # REMOVE
-            print(J, yhat)
-            break
             if getattr(self, "with_grad"):
                 self.backward(y, yhat)
                 self.step()
             losses.append(J)
+        logging.debug(np.mean(losses))
         return np.mean(losses)
 
     def train(self, X_tr: np.ndarray, y_tr: np.ndarray,
@@ -461,16 +490,18 @@ class NN:
             train_losses: Training losses *after* each training epoch
             test_losses: Test losses *after* each training epoch
         """
-        # alpha needs to be the shape of x_features
-        # beta needs to be the shape of labels
-        self.alpha, self.beta = X_tr.shape[1], y_tr.shape[0]
+        # alpha is (128 x 4) since X is (500 x 128)
+        self.alpha = self.weight_init_fn((self.input_size + 1, self.hidden_size))
+        # output from sigmoid is (4 x 1), but I need it to be (1 x 4)
+        # beta is (4 x 10) since output is (1 x 10)
+        self.beta = self.weight_init_fn((self.hidden_size, self.output_size))
         mean_tr_errs = []
         mean_te_errs = []
         for e in range(n_epochs):
             X_shuffled, y_shuffled = shuffle(X_tr, y_tr, e)
 
             self.with_grad = True
-            loss_tr, _ = self.compute_loss(X_shuffled, y_shuffled)
+            loss_tr = self.compute_loss(X_shuffled, y_shuffled)
             mean_tr_errs.append(loss_tr)
 
             self.with_grad = False
@@ -516,6 +547,10 @@ if __name__ == "__main__":
     # what is being returned.
     (X_tr, y_tr, X_test, y_test, out_tr, out_te, out_metrics,
      n_epochs, n_hid, init_flag, lr) = args2data(args)
+    
+    # for idx, i in enumerate(args2data(args)):
+        # logging.debug(f"arg {idx}:{i}")
+
 
     nn = NN(
         input_size=X_tr.shape[-1],
