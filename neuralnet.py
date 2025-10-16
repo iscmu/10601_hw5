@@ -142,8 +142,6 @@ class SoftMaxCrossEntropy:
         :param z: input logits of shape (num_classes,)
         :return: softmax output of shape (num_classes,)
         """
-        # TODO: implement
-
         return np.exp(z)/np.sum(np.exp(z), axis=None)
 
     def _cross_entropy(self, y: int, y_hat: np.ndarray) -> float:
@@ -153,7 +151,6 @@ class SoftMaxCrossEntropy:
         :param y_hat: prediction with shape (num_classes,)
         :return: cross entropy loss
         """
-        # TODO: implement
         return -np.log(y_hat[y])
 
     def forward(self, z: np.ndarray, y: int) -> Tuple[np.ndarray, float]:
@@ -165,7 +162,6 @@ class SoftMaxCrossEntropy:
             y: predictions from softmax as an np.ndarray
             loss: cross entropy loss
         """
-        # TODO: Call your implementations of _softmax and _cross_entropy here
         yhat = self._softmax(z)
         assert(yhat.shape == (10,))
         return yhat, self._cross_entropy(y, yhat)
@@ -188,6 +184,7 @@ class SoftMaxCrossEntropy:
         # PG 29 - see wq 2.2C
         ypred = np.zeros(len(y_hat))
         ypred[y] = 1
+        # THIS IS DEFINITELY CORRECT (ATLEAST THE SHAPE)
         return y_hat - ypred
 
 
@@ -211,8 +208,11 @@ class Sigmoid:
         """
         # TODO: perform forward pass and save any values you may need for
         #  the backward pass
-        self.x = 1/(1 + np.exp(-x))
+        self.x = x
         return 1/(1 + np.exp(-x))
+        # # #RELU
+        # self.x = x
+        # return np.maximum(0, x)
     
     def backward(self, dz: np.ndarray) -> np.ndarray:
         """
@@ -221,18 +221,14 @@ class Sigmoid:
         :return: partial derivative of loss with respect to input of
             sigmoid activation
         """
-        # TODO: implement
-        # raise NotImplementedError
-        # s' = s(1-s)
-        grad = np.sum(dz, axis=0) * (1/(1 + np.exp(-self.x)) * (1 - 1/(1 + np.exp(-self.x)))[:, None].T)
-        return grad
-
-
+        # dL/di = dL/dz * dz/di
+        # dz/di = sigmoid(x)' = sigmoid(x) * (1-sigmoid(x))
+        dzdi = (1/(1 + np.exp(-self.x)) * (1 - 1/(1 + np.exp(-self.x)))[:, None].T)
+        return dz * dzdi
 
 # This refers to a function type that takes in a tuple of 2 integers (row, col)
 # and returns a numpy array (which should have the specified dimensions).
 INIT_FN_TYPE = Callable[[Tuple[int, int]], np.ndarray]
-
 
 class Linear:
     def __init__(self, input_size: int, output_size: int,
@@ -248,7 +244,7 @@ class Linear:
         :param learning_rate: learning rate for SGD training updates
         """
         # Initialize learning rate for SGD
-        self.lr = learning_rate
+        self.learning_rate = learning_rate
 
         # TODO: Initialize weight matrix for this layer - since we are
         #  folding the bias into the weight matrix, be careful about the
@@ -262,7 +258,7 @@ class Linear:
         self.bias = np.zeros(output_size)
 
         # TODO: Initialize matrix to store gradient with respect to weights
-        self.grad_weights = weight_init_fn((input_size + 1, output_size))
+        self.dw = weight_init_fn((input_size + 1, output_size))
 
         # TODO: Initialize any additional values you may need to store for the
         #  backward pass here
@@ -305,24 +301,25 @@ class Linear:
         HINT: You may want to use some of the values you previously cached in 
         your forward() method.
         """
-        # TODO: implement
-        # 
         if len(dz.shape) < 2:
             dz = dz[:, None]
         self.x = self.x[None, :]
+        # dw = dL/dw = dL/dz * dz/dw
         self.dw = dz @ self.x
-        return self.dw
-        # raise NotImplementedError
+        # dx = dL/dx = dL/dz * dz/dx (return condition)
+        dx = dz.T @ self.dw
+        return dx
 
-    # def step(self) -> None:
-    #     """
-    #     Apply SGD update to weights using self.dw, which should have been 
-    #     set in NN.backward().
-    #     """
-    #     # TODO: implement
-    #     self.w = self.w - self.learning_rate * self.dw
-    #     # raise NotImplementedError
-
+    def step(self) -> None:
+        """
+        Apply SGD update to weights using self.dw, which should have been 
+        set in NN.backward().
+        """
+        # TODO: implement
+        b_w = np.concatenate((self.bias[:, None].T, self.weights), axis=0)
+        b_w = b_w - (self.learning_rate * self.dw).T
+        self.bias = b_w[0, :]
+        self.weights = b_w[1:, :]
 
 class NN:
     def __init__(self, input_size: int, hidden_size: int, output_size: int,
@@ -387,12 +384,23 @@ class NN:
         # raise NotImplementedError
         assert(y_hat.shape == (10,))
         self.gj = djdj = 1
-        self.gb = self.act2.backward(y, y_hat)
+
+        # gb = gradient with shape (num_classes,)
+        self.gb = self.act2.backward(y, y_hat) #DEFINITELY CORRECT
+        logging.debug(f"gb\n {self.gb}")
+
+        # gz = partial derivative of loss with respect to input x of linear
         self.gz = self.l2.backward(self.gb)
+        logging.debug(f"gz\n {self.gz}")
+
+        # ga = partial derivative of loss with respect to input of sigmoid activation
         self.ga = self.act1.backward(self.gz[:, 1:]) # Removing the gradient of the bias
+        logging.debug(f"ga\n {self.ga}")
+
+        # gx = partial derivative of loss with respect to input x of linear
         self.gx = self.l1.backward(self.ga.T)
-        # print("y", y)
-        # print(y_hat)
+        logging.debug(f"gx\n {self.gx}")
+
         # print(y, y_hat, self.gj, self.gb, self.gz, self.ga, self.gx, sep='\n')
 
 
@@ -401,18 +409,18 @@ class NN:
         Apply SGD update to weights.
         """
         # # TODO: call step for each relevant layer
-        # self.l1.step()
-        # self.l2.step() v pizdu 
+        self.l1.step()
+        self.l2.step() 
 
-        self.alpha = self.alpha - getattr(self, "learning_rate") * getattr(self, "gx").T
-        assert(self.alpha.shape == (129, 4))
-        self.l1.weights = self.alpha[1:,:]
-        self.l1.bias = self.alpha[1, :]
+        # self.alpha = self.alpha - getattr(self, "learning_rate") * getattr(self, "gx").T
+        # assert(self.alpha.shape == (129, 4))
+        # self.l1.weights = self.alpha[1:,:]
+        # self.l1.bias = self.alpha[1, :]
 
-        self.beta = self.beta - getattr(self, "learning_rate") * getattr(self, "gz").T
-        assert(self.beta.shape == (5, 10))
-        self.l2.weights = self.beta[1:,:]
-        self.l2.bias = self.beta[1, ]
+        # self.beta = self.beta - getattr(self, "learning_rate") * getattr(self, "gz").T
+        # assert(self.beta.shape == (5, 10))
+        # self.l2.weights = self.beta[1:,:]
+        # self.l2.bias = self.beta[1, ]
 
     def compute_loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
@@ -424,6 +432,7 @@ class NN:
         # TODO: compute loss over the entire dataset
         #  Hint: reuse your forward function
         losses = []
+        i = 0
         for x, y in zip(X, y):
             yhat,J = self.forward(x, y)
             # REMOVE
