@@ -284,7 +284,7 @@ class Linear:
         :param learning_rate: learning rate for SGD training updates
         """
         # Initialize learning rate for SGD
-        self.learning_rate = learning_rate
+        self.lr = learning_rate
 
         # TODO: Initialize weight matrix for this layer - since we are
         #  folding the bias into the weight matrix, be careful about the
@@ -298,7 +298,7 @@ class Linear:
         self.bias = np.zeros(output_size)
 
         # TODO: Initialize matrix to store gradient with respect to weights
-        self.dw = weight_init_fn((input_size + 1, output_size))
+        self.grad_weights = weight_init_fn((input_size + 1, output_size))
 
         # TODO: Initialize any additional values you may need to store for the
         #  backward pass here
@@ -323,6 +323,7 @@ class Linear:
 
         # Folding bias into position 0
         # Caching for backward pass
+        self.x = np.insert(x, 0, 1)
         return  x @ self.weights + self.bias
 
     def backward(self, dz: np.ndarray) -> np.ndarray:
@@ -341,11 +342,12 @@ class Linear:
         your forward() method.
         """
         # TODO: implement
+        # 
         if len(dz.shape) < 2:
             dz = dz[:, None]
         self.x = self.x[None, :]
-        self.dw = dz @ self.x
-        return self.dw
+        weights = dz @ self.x
+        return weights
         # raise NotImplementedError
 
     def step(self) -> None:
@@ -354,11 +356,7 @@ class Linear:
         set in NN.backward().
         """
         # TODO: implement
-        w_b = np.concantenate(self.w, self.bias) - self.learning_rate * self.dw
-        self.weights = w_b[:, :-1]
-        print(self.weights.shape)
-        self.bias = w_b[:, -1]
-        print(self.bias.shape)
+        self.w = self.w - self.learning_rate * self.dw
         # raise NotImplementedError
 
 
@@ -448,13 +446,8 @@ class NN:
         Apply SGD update to weights.
         """
         # TODO: call step for each relevant layer
-        self.l1.step()
-        self.l2.step()
-        logging.debug(sum(self.l1.w))
-        logging.debug(sum(self.l2.w))
-        # self.alpha = self.alpha - getattr(self, "learning_rate") * getattr(self, "gx").T
-        # self.beta = self.beta - getattr(self, "learning_rate") * getattr(self, "gz").T
-
+        self.alpha = self.alpha - getattr(self, "learning_rate") * getattr(self, "gx").T
+        self.beta = self.beta - getattr(self, "learning_rate") * getattr(self, "gz").T
 
     def compute_loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
