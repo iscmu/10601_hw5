@@ -143,6 +143,7 @@ class SoftMaxCrossEntropy:
         :return: softmax output of shape (num_classes,)
         """
         # TODO: implement
+
         return np.exp(z)/np.sum(np.exp(z), axis=None)
 
     def _cross_entropy(self, y: int, y_hat: np.ndarray) -> float:
@@ -153,7 +154,7 @@ class SoftMaxCrossEntropy:
         :return: cross entropy loss
         """
         # TODO: implement
-        return np.log(y_hat[y])
+        return -np.log(y_hat[y])
 
     def forward(self, z: np.ndarray, y: int) -> Tuple[np.ndarray, float]:
         """
@@ -166,7 +167,6 @@ class SoftMaxCrossEntropy:
         """
         # TODO: Call your implementations of _softmax and _cross_entropy here
         yhat = self._softmax(z)
-        # logging.debug(f"yhat {yhat}")
         assert(yhat.shape == (10,))
         return yhat, self._cross_entropy(y, yhat)
 
@@ -185,10 +185,10 @@ class SoftMaxCrossEntropy:
         :return: gradient with shape (num_classes,)
         """
         # TODO: implement using the formula you derived in the written
-        # return 1/y_hat[y]
         # PG 29 - see wq 2.2C
-        # logging.debug(f"checkpoint 0 {y_hat} {y}")
-        return y_hat - y
+        ypred = np.zeros(len(y_hat))
+        ypred[y] = 1
+        return y_hat - ypred
 
 
 class Sigmoid:
@@ -211,10 +211,7 @@ class Sigmoid:
         """
         # TODO: perform forward pass and save any values you may need for
         #  the backward pass
-        # self.x = x
-
         self.x = 1/(1 + np.exp(-x))
-
         return 1/(1 + np.exp(-x))
     
     def backward(self, dz: np.ndarray) -> np.ndarray:
@@ -229,39 +226,6 @@ class Sigmoid:
         # s' = s(1-s)
         grad = np.sum(dz, axis=0) * (1/(1 + np.exp(-self.x)) * (1 - 1/(1 + np.exp(-self.x)))[:, None].T)
         return grad
-
-# Note: The ReLU class is only required for the empirical section.
-# The autograder does not test this component, so your submission will still
-# pass without implementing it.
-class ReLU:
-    def __init__(self):
-        """
-        Initialize state for ReLU activation layer
-        """
-        # TODO: Initialize any additional values you may need to store for the
-        #  backward pass here
-        raise NotImplementedError
-
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        """
-        Apply ReLU activation: f(x) = max(0, x)
-        :param x: Input to activation function, shape (output_size,)
-        :return: Output of ReLU activation, shape (output_size,)
-        """
-        # TODO: perform the forward pass for ReLU and save any values you may
-        #  need for the backward pass
-        raise NotImplementedError
-
-    def backward(self, dz: np.ndarray) -> np.ndarray:
-        """
-        Backward pass through ReLU
-        :param dz: partial derivative of loss w.r.t. ReLU output
-        :return: partial derivative of loss w.r.t. ReLU input
-        """
-        # TODO: implement the backward pass
-        #  Hint: derivative of ReLU is 1 for positive inputs and 0 for
-        #  non-positive inputs (x <= 0)
-        raise NotImplementedError
 
 
 
@@ -346,18 +310,18 @@ class Linear:
         if len(dz.shape) < 2:
             dz = dz[:, None]
         self.x = self.x[None, :]
-        weights = dz @ self.x
-        return weights
+        self.dw = dz @ self.x
+        return self.dw
         # raise NotImplementedError
 
-    def step(self) -> None:
-        """
-        Apply SGD update to weights using self.dw, which should have been 
-        set in NN.backward().
-        """
-        # TODO: implement
-        self.w = self.w - self.learning_rate * self.dw
-        # raise NotImplementedError
+    # def step(self) -> None:
+    #     """
+    #     Apply SGD update to weights using self.dw, which should have been 
+    #     set in NN.backward().
+    #     """
+    #     # TODO: implement
+    #     self.w = self.w - self.learning_rate * self.dw
+    #     # raise NotImplementedError
 
 
 class NN:
@@ -405,15 +369,10 @@ class NN:
         """
         # TODO: call forward pass for each layer
         a = self.l1.forward(x)
-        # logging.debug(f"l1 output:{a}")
         z = self.act1.forward(a)
-        # logging.debug(f"sigmoid output:{z}")
         b = self.l2.forward(z)
-        # logging.debug(f"l2 output:{b}")
         # Note that softmax and cross entropy embedded within a single layer
         yhat, cross_entropy = self.act2.forward(b, y)
-        # logging.debug(f"yhat output:{yhat}")
-        # logging.debug(f"cross_entropy output:{cross_entropy}")
         assert(yhat.shape == (10,))
         return yhat, cross_entropy
     
@@ -427,27 +386,33 @@ class NN:
         # TODO: call backward pass for each layer
         # raise NotImplementedError
         assert(y_hat.shape == (10,))
-        # logging.debug("BACKWARD")
         self.gj = djdj = 1
-        # logging.debug(f"gj {self.gj}")
         self.gb = self.act2.backward(y, y_hat)
-        # logging.debug(f"gb {self.gb}")
         self.gz = self.l2.backward(self.gb)
-        # logging.debug(f"\ngz {self.gz}")
-        self.gz = self.gz[:, 1:] # Removing the gradient of the bias
-        self.ga = self.act1.backward(self.gz)
-        # logging.debug(f"ga {self.ga}")
+        self.ga = self.act1.backward(self.gz[:, 1:]) # Removing the gradient of the bias
         self.gx = self.l1.backward(self.ga.T)
-        # logging.debug(f"gx {self.gx}")
+        # print("y", y)
+        # print(y_hat)
+        # print(y, y_hat, self.gj, self.gb, self.gz, self.ga, self.gx, sep='\n')
 
 
     def step(self):
         """
         Apply SGD update to weights.
         """
-        # TODO: call step for each relevant layer
+        # # TODO: call step for each relevant layer
+        # self.l1.step()
+        # self.l2.step() v pizdu 
+
         self.alpha = self.alpha - getattr(self, "learning_rate") * getattr(self, "gx").T
+        assert(self.alpha.shape == (129, 4))
+        self.l1.weights = self.alpha[1:,:]
+        self.l1.bias = self.alpha[1, :]
+
         self.beta = self.beta - getattr(self, "learning_rate") * getattr(self, "gz").T
+        assert(self.beta.shape == (5, 10))
+        self.l2.weights = self.beta[1:,:]
+        self.l2.bias = self.beta[1, ]
 
     def compute_loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
@@ -466,7 +431,7 @@ class NN:
                 self.backward(y, yhat)
                 self.step()
             losses.append(J)
-        logging.debug(np.mean(losses))
+            # break
         return np.mean(losses)
 
     def train(self, X_tr: np.ndarray, y_tr: np.ndarray,
@@ -487,7 +452,7 @@ class NN:
         self.alpha = self.weight_init_fn((self.input_size + 1, self.hidden_size))
         # output from sigmoid is (4 x 1), but I need it to be (1 x 4)
         # beta is (4 x 10) since output is (1 x 10)
-        self.beta = self.weight_init_fn((self.hidden_size, self.output_size))
+        self.beta = self.weight_init_fn((self.hidden_size + 1, self.output_size))
         mean_tr_errs = []
         mean_te_errs = []
         for e in range(n_epochs):
@@ -500,7 +465,7 @@ class NN:
             self.with_grad = False
             loss_te = self.compute_loss(X_test, y_test)
             mean_te_errs.append(loss_te)
-
+            # break
         return mean_tr_errs, mean_te_errs
     
     def test(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
@@ -540,9 +505,6 @@ if __name__ == "__main__":
     # what is being returned.
     (X_tr, y_tr, X_test, y_test, out_tr, out_te, out_metrics,
      n_epochs, n_hid, init_flag, lr) = args2data(args)
-    
-    # for idx, i in enumerate(args2data(args)):
-        # logging.debug(f"arg {idx}:{i}")
 
 
     nn = NN(
@@ -556,6 +518,8 @@ if __name__ == "__main__":
     # train model
     # (this line of code is already written for you)
     train_losses, test_losses = nn.train(X_tr, y_tr, X_test, y_test, n_epochs)
+    print(train_losses)
+    print("DONE TRAINING")
 
     # # test model and get predicted labels and errors 
     # # (this line of code is written for you)
@@ -582,3 +546,38 @@ if __name__ == "__main__":
     #             cur_epoch, cur_te_loss))
     #     f.write("error(train): {}\n".format(train_error_rate))
     #     f.write("error(validation): {}\n".format(test_error_rate))
+
+
+
+# Note: The ReLU class is only required for the empirical section.
+# The autograder does not test this component, so your submission will still
+# pass without implementing it.
+class ReLU:
+    def __init__(self):
+        """
+        Initialize state for ReLU activation layer
+        """
+        # TODO: Initialize any additional values you may need to store for the
+        #  backward pass here
+        raise NotImplementedError
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        """
+        Apply ReLU activation: f(x) = max(0, x)
+        :param x: Input to activation function, shape (output_size,)
+        :return: Output of ReLU activation, shape (output_size,)
+        """
+        # TODO: perform the forward pass for ReLU and save any values you may
+        #  need for the backward pass
+        raise NotImplementedError
+
+    def backward(self, dz: np.ndarray) -> np.ndarray:
+        """
+        Backward pass through ReLU
+        :param dz: partial derivative of loss w.r.t. ReLU output
+        :return: partial derivative of loss w.r.t. ReLU input
+        """
+        # TODO: implement the backward pass
+        #  Hint: derivative of ReLU is 1 for positive inputs and 0 for
+        #  non-positive inputs (x <= 0)
+        raise NotImplementedError
