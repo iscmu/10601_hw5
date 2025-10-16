@@ -432,12 +432,10 @@ class NN:
         i = 0
         for x, y in zip(X, y):
             yhat,J = self.forward(x, y)
-            # REMOVE
-            if getattr(self, "with_grad"):
-                self.backward(y, yhat)
-                self.step()
+            # if getattr(self, "with_grad"):
+            #     self.backward(y, yhat)
+            #     self.step()
             losses.append(J)
-            # break
         return np.mean(losses)
 
     def train(self, X_tr: np.ndarray, y_tr: np.ndarray,
@@ -463,15 +461,16 @@ class NN:
         mean_te_errs = []
         for e in range(n_epochs):
             X_shuffled, y_shuffled = shuffle(X_tr, y_tr, e)
+            for x,y in zip(X_shuffled, y_shuffled):
+                yhat,J = self.forward(x, y)
+                self.backward(y, yhat)
+                self.step()
 
-            self.with_grad = True
             loss_tr = self.compute_loss(X_shuffled, y_shuffled)
             mean_tr_errs.append(loss_tr)
 
-            self.with_grad = False
             loss_te = self.compute_loss(X_test, y_test)
             mean_te_errs.append(loss_te)
-            # break
         return mean_tr_errs, mean_te_errs
     
     def test(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
