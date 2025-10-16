@@ -251,7 +251,7 @@ class Linear:
         self.w = weight_init_fn((output_size, input_size))
 
         # TODO: set the bias terms to zero
-        self.bias = weight_init_fn((output_size,1))
+        self.bias = np.zeros((output_size,1))
         self.w = np.concatenate((self.w, self.bias), axis=1)
 
         # TODO: Initialize matrix to store gradient with respect to weights
