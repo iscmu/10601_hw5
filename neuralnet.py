@@ -21,7 +21,7 @@ hinting syntax, see https://docs.python.org/3/library/typing.html.
 import numpy as np
 import argparse
 from typing import Callable, List, Tuple
-import logging
+# import logging
 
 # This takes care of command line argument parsing for you!
 # To access a specific argument, simply access args.<argument name>.
@@ -163,7 +163,6 @@ class SoftMaxCrossEntropy:
             loss: cross entropy loss
         """
         yhat = self._softmax(z)
-        assert(yhat.shape == (10,))
         return yhat, self._cross_entropy(y, yhat)
 
     def backward(self, y: int, y_hat: np.ndarray) -> np.ndarray:
@@ -255,7 +254,7 @@ class Linear:
         self.w = np.concatenate((self.w, self.bias), axis=1)
 
         # TODO: Initialize matrix to store gradient with respect to weights
-        self.dw = weight_init_fn((output_size, input_size + 1))
+        self.dw = np.zeros((output_size, input_size + 1))
 
         # TODO: Initialize any additional values you may need to store for the
         #  backward pass here
@@ -376,7 +375,6 @@ class NN:
         b = self.linear2.forward(z)
         # Note that softmax and cross entropy embedded within a single layer
         yhat, cross_entropy = self.act2.forward(b, y)
-        assert(yhat.shape == (10,))
         return yhat, cross_entropy
     
     def backward(self, y: int, y_hat: np.ndarray) -> None:
@@ -388,25 +386,23 @@ class NN:
         """
         # TODO: call backward pass for each layer
         # raise NotImplementedError
-        assert(y_hat.shape == (10,))
         self.gj = djdj = 1
 
         # gb = gradient with shape (num_classes,)
         self.gb = self.act2.backward(y, y_hat) #DEFINITELY CORRECT
-        logging.debug(f"gb\n {self.gb}")
-        assert(self.gb.shape == (10,))
+        # logging.debug(f"gb\n {self.gb}")
 
         # gz = partial derivative of loss with respect to input x of linear
         self.gz = self.linear2.backward(self.gb)
-        logging.debug(f"gz\n {self.gz}")
+        # logging.debug(f"gz\n {self.gz}")
 
         # ga = partial derivative of loss with respect to input of sigmoid activation
         self.ga = self.act1.backward(self.gz) # Removing the gradient of the bias
-        logging.debug(f"ga\n {self.ga}")
+        # logging.debug(f"ga\n {self.ga}")
 
         # gx = partial derivative of loss with respect to input x of linear
         self.gx = self.linear1.backward(self.ga.T)
-        logging.debug(f"gx\n {self.gx}")
+        # logging.debug(f"gx\n {self.gx}")
 
         # print(y, y_hat, self.gj, self.gb, self.gz, self.ga, self.gx, sep='\n')
 
@@ -432,9 +428,6 @@ class NN:
         i = 0
         for x, y in zip(X, y):
             yhat,J = self.forward(x, y)
-            # if getattr(self, "with_grad"):
-            #     self.backward(y, yhat)
-            #     self.step()
             losses.append(J)
         return np.mean(losses)
 
@@ -453,10 +446,8 @@ class NN:
             test_losses: Test losses *after* each training epoch
         """
         # alpha is (128 x 4) since X is (500 x 128)
-        self.alpha = self.weight_init_fn((self.input_size + 1, self.hidden_size))
         # output from sigmoid is (4 x 1), but I need it to be (1 x 4)
         # beta is (4 x 10) since output is (1 x 10)
-        self.beta = self.weight_init_fn((self.hidden_size + 1, self.output_size))
         mean_tr_errs = []
         mean_te_errs = []
         for e in range(n_epochs):
@@ -492,10 +483,10 @@ class NN:
 
 if __name__ == "__main__":
 
-    logfile = '/Users/iskandersergazin/CarngieMellonUniversity/10601/hw5/handout/example.log'
-    loglevel = logging.DEBUG
-    logging.basicConfig(filename=logfile, filemode='a', level=loglevel)
-    logging.info('\n-------------------- START --------------------')
+    # logfile = '/Users/iskandersergazin/CarngieMellonUniversity/10601/hw5/handout/example.log'
+    # loglevel = logging.DEBUG
+    # logging.basicConfig(filename=logfile, filemode='a', level=loglevel)
+    # logging.info('\n-------------------- START --------------------')
 
     args = parser.parse_args()
     # Note: You can access arguments like learning rate with args.learning_rate
