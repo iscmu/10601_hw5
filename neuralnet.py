@@ -247,14 +247,15 @@ class Linear:
         #  To be consistent with the formulas you derived in the written and
         #  in order for the unit tests to work correctly,
         #  the first dimension should be the output size
-        self.w = weight_init_fn((output_size, input_size))
+        self.w = weight_init_fn((output_size, input_size + 1))
 
         # TODO: set the bias terms to zero
-        self.bias = np.zeros((output_size,1))
-        self.w = np.concatenate((self.w, self.bias), axis=1)
+        # self.bias = np.zeros((output_size,1))
+        # self.w = np.concatenate((self.w, self.bias), axis=1)
+        self.w[:, 0] = 0
 
         # TODO: Initialize matrix to store gradient with respect to weights
-        self.dw = np.zeros((output_size, input_size + 1))
+        self.dw = None
 
         # TODO: Initialize any additional values you may need to store for the
         #  backward pass here
@@ -278,7 +279,7 @@ class Linear:
         #  the backward pass
         # (inp_size,) wo bias
 
-        #bias has to go in the beginning or no pass
+        # bias has to go in the beginning or no pass
         x = np.insert(x, 0, 1)
         # x has shape (in_size, )
         # wt has shape (out_size, in_size)
