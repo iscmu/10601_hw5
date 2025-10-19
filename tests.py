@@ -13,7 +13,7 @@ import numpy as np
 import pickle as pk
 from numpy.testing import assert_allclose
 
-from neuralnet import (
+from handout.neuralnet import (
     Linear, Sigmoid, SoftMaxCrossEntropy, NN,
     zero_init, random_init
 )

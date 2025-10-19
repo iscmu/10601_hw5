@@ -21,7 +21,7 @@ hinting syntax, see https://docs.python.org/3/library/typing.html.
 import numpy as np
 import argparse
 from typing import Callable, List, Tuple
-# import logging
+import logging
 
 # This takes care of command line argument parsing for you!
 # To access a specific argument, simply access args.<argument name>.
@@ -250,8 +250,6 @@ class Linear:
         self.w = weight_init_fn((output_size, input_size + 1))
 
         # TODO: set the bias terms to zero
-        # self.bias = np.zeros((output_size,1))
-        # self.w = np.concatenate((self.w, self.bias), axis=1)
         self.w[:, 0] = 0
 
         # TODO: Initialize matrix to store gradient with respect to weights
@@ -319,12 +317,7 @@ class Linear:
         set in NN.backward().
         """
         # TODO: implement BIAS
-        # IGNORING BIAS
-        # b_w = np.concatenate((self.bias, self.w), axis=1)
-        # b_w = self.w
-        # b_w = b_w - (self.learning_rate * self.dw)
-        # self.bias = b_w[0, :]
-        # self.w = b_w[1:, :]
+        logging.debug(self.w)
         self.w = self.w - (self.learning_rate * self.dw)
 
 class NN:
@@ -391,21 +384,16 @@ class NN:
 
         # gb = gradient with shape (num_classes,)
         self.gb = self.act2.backward(y, y_hat) #DEFINITELY CORRECT
-        # logging.debug(f"gb\n {self.gb}")
 
         # gz = partial derivative of loss with respect to input x of linear
         self.gz = self.linear2.backward(self.gb)
-        # logging.debug(f"gz\n {self.gz}")
 
         # ga = partial derivative of loss with respect to input of sigmoid activation
         self.ga = self.act1.backward(self.gz) # Removing the gradient of the bias
-        # logging.debug(f"ga\n {self.ga}")
 
         # gx = partial derivative of loss with respect to input x of linear
         self.gx = self.linear1.backward(self.ga.T)
-        # logging.debug(f"gx\n {self.gx}")
 
-        # print(y, y_hat, self.gj, self.gb, self.gz, self.ga, self.gx, sep='\n')
 
 
     def step(self):
@@ -484,10 +472,10 @@ class NN:
 
 if __name__ == "__main__":
 
-    # logfile = '/Users/iskandersergazin/CarngieMellonUniversity/10601/hw5/handout/example.log'
-    # loglevel = logging.DEBUG
-    # logging.basicConfig(filename=logfile, filemode='a', level=loglevel)
-    # logging.info('\n-------------------- START --------------------')
+    logfile = '/Users/iskandersergazin/CarngieMellonUniversity/10601/hw5/handout/example.log'
+    loglevel = logging.DEBUG
+    logging.basicConfig(filename=logfile, filemode='a', level=loglevel)
+    logging.info('\n-------------------- START --------------------')
 
     args = parser.parse_args()
     # Note: You can access arguments like learning rate with args.learning_rate
@@ -501,8 +489,17 @@ if __name__ == "__main__":
     # See the docstring of `args2data` for an explanation of 
     # what is being returned.
     (X_tr, y_tr, X_test, y_test, out_tr, out_te, out_metrics,
-     n_epochs, n_hid, init_flag, lr) = args2data(args)
+     _, _, _, _) = args2data(args)
+    n_epochs = 1
+    n_hid = 4
+    init_flag = 2
+    lr = 0.1
 
+
+    # def plot_curve(lr):
+    losses_tr = []
+    losses_te = []
+    # for n_hid in n_hidden:
 
     nn = NN(
         input_size=X_tr.shape[-1],
@@ -511,33 +508,39 @@ if __name__ == "__main__":
         weight_init_fn=zero_init if init_flag == 2 else random_init,
         learning_rate=lr
     )
-
-    # train model
-    # (this line of code is already written for you)
     train_losses, test_losses = nn.train(X_tr, y_tr, X_test, y_test, n_epochs)
 
-    # test model and get predicted labels and errors 
-    # (this line of code is written for you)
-    train_labels, train_error_rate = nn.test(X_tr, y_tr)
-    test_labels, test_error_rate = nn.test(X_test, y_test)
 
-    # Write predicted label and error into file
-    # Note that this assumes train_losses and test_losses are lists of floats
-    # containing the per-epoch loss values.
-    with open(out_tr, "w") as f:
-        for label in train_labels:
-            f.write(str(label) + "\n")
-    with open(out_te, "w") as f:
-        for label in test_labels:
-            f.write(str(label) + "\n")
-    with open(out_metrics, "w") as f:
-        for i in range(len(train_losses)):
-            cur_epoch = i + 1
-            cur_tr_loss = train_losses[i]
-            cur_te_loss = test_losses[i]
-            f.write("epoch={} crossentropy(train): {}\n".format(
-                cur_epoch, cur_tr_loss))
-            f.write("epoch={} crossentropy(validation): {}\n".format(
-                cur_epoch, cur_te_loss))
-        f.write("error(train): {}\n".format(train_error_rate))
-        f.write("error(validation): {}\n".format(test_error_rate))
+
+# Note: The ReLU class is only required for the empirical section.
+# The autograder does not test this component, so your submission will still
+# pass without implementing it.
+class ReLU:
+    def __init__(self):
+        """
+        Initialize state for ReLU activation layer
+        """
+        # TODO: Initialize any additional values you may need to store for the
+        #  backward pass here
+        raise NotImplementedError
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        """
+        Apply ReLU activation: f(x) = max(0, x)
+        :param x: Input to activation function, shape (output_size,)
+        :return: Output of ReLU activation, shape (output_size,)
+        """
+        # TODO: perform the forward pass for ReLU and save any values you may
+        #  need for the backward pass
+        raise NotImplementedError
+
+    def backward(self, dz: np.ndarray) -> np.ndarray:
+        """
+        Backward pass through ReLU
+        :param dz: partial derivative of loss w.r.t. ReLU output
+        :return: partial derivative of loss w.r.t. ReLU input
+        """
+        # TODO: implement the backward pass
+        #  Hint: derivative of ReLU is 1 for positive inputs and 0 for
+        #  non-positive inputs (x <= 0)
+        raise NotImplementedError

@@ -501,43 +501,78 @@ if __name__ == "__main__":
     # See the docstring of `args2data` for an explanation of 
     # what is being returned.
     (X_tr, y_tr, X_test, y_test, out_tr, out_te, out_metrics,
-     n_epochs, n_hid, init_flag, lr) = args2data(args)
+     _, _, _, _) = args2data(args)
+    
+    init_flag = 1
+    lr = 0.001
+    n_epochs = 100
+    n_hidden = [5, 20, 50, 100, 200]
 
 
-    nn = NN(
-        input_size=X_tr.shape[-1],
-        hidden_size=n_hid,
-        output_size=len(labels),
-        weight_init_fn=zero_init if init_flag == 2 else random_init,
-        learning_rate=lr
-    )
+    losses_tr = []
+    losses_te = []
+    for n_hid in n_hidden:
 
-    # train model
-    # (this line of code is already written for you)
-    train_losses, test_losses = nn.train(X_tr, y_tr, X_test, y_test, n_epochs)
+        nn = NN(
+            input_size=X_tr.shape[-1],
+            hidden_size=n_hid,
+            output_size=len(labels),
+            weight_init_fn=zero_init if init_flag == 2 else random_init,
+            learning_rate=lr
+        )
+        train_losses, test_losses = nn.train(X_tr, y_tr, X_test, y_test, n_epochs)
+        test_labels, test_error_rate = nn.test(X_test, y_test)
+        print(len(train_losses))
+        assert(len(train_losses) == 100)
+        losses_tr.append(train_losses[-1])
+        losses_te.append(test_losses[-1])
+    
+    import matplotlib.pyplot as plt
 
-    # test model and get predicted labels and errors 
-    # (this line of code is written for you)
-    train_labels, train_error_rate = nn.test(X_tr, y_tr)
-    test_labels, test_error_rate = nn.test(X_test, y_test)
+    fig, ax = plt.subplots()
+    # 4. computer generated line graphs/curves
+    ax.plot(n_hidden, losses_tr, label="training")
+    ax.plot(n_hidden, losses_te, label='validation')
+    # 3. provide a legend
+    ax.legend()
+    # 1. title your graph
+    ax.set_title("Number of hidden units against average loss over 100 epochs")
+    # 2. label your axes
+    ax.set_xlabel("Number of hidden units")
+    ax.set_ylabel("Average cross-entropy loss")
+    plt.show()
 
-    # Write predicted label and error into file
-    # Note that this assumes train_losses and test_losses are lists of floats
-    # containing the per-epoch loss values.
-    with open(out_tr, "w") as f:
-        for label in train_labels:
-            f.write(str(label) + "\n")
-    with open(out_te, "w") as f:
-        for label in test_labels:
-            f.write(str(label) + "\n")
-    with open(out_metrics, "w") as f:
-        for i in range(len(train_losses)):
-            cur_epoch = i + 1
-            cur_tr_loss = train_losses[i]
-            cur_te_loss = test_losses[i]
-            f.write("epoch={} crossentropy(train): {}\n".format(
-                cur_epoch, cur_tr_loss))
-            f.write("epoch={} crossentropy(validation): {}\n".format(
-                cur_epoch, cur_te_loss))
-        f.write("error(train): {}\n".format(train_error_rate))
-        f.write("error(validation): {}\n".format(test_error_rate))
+
+
+# Note: The ReLU class is only required for the empirical section.
+# The autograder does not test this component, so your submission will still
+# pass without implementing it.
+class ReLU:
+    def __init__(self):
+        """
+        Initialize state for ReLU activation layer
+        """
+        # TODO: Initialize any additional values you may need to store for the
+        #  backward pass here
+        raise NotImplementedError
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        """
+        Apply ReLU activation: f(x) = max(0, x)
+        :param x: Input to activation function, shape (output_size,)
+        :return: Output of ReLU activation, shape (output_size,)
+        """
+        # TODO: perform the forward pass for ReLU and save any values you may
+        #  need for the backward pass
+        raise NotImplementedError
+
+    def backward(self, dz: np.ndarray) -> np.ndarray:
+        """
+        Backward pass through ReLU
+        :param dz: partial derivative of loss w.r.t. ReLU output
+        :return: partial derivative of loss w.r.t. ReLU input
+        """
+        # TODO: implement the backward pass
+        #  Hint: derivative of ReLU is 1 for positive inputs and 0 for
+        #  non-positive inputs (x <= 0)
+        raise NotImplementedError
